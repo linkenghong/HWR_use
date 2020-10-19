@@ -2,6 +2,7 @@ from PIL import Image
 from segmentation import find_best_borders_connect, find_best_borders_projection, find_best_borders_gas, show_borders
 from prediction import image_prediction
 import sys
+from glob import glob
 from alfred.utils.log import logger as logging
 
 
@@ -35,7 +36,7 @@ def ha_SignCompare(image, text):
             for border in borders:
                 pred_char, conf, toplist = image_prediction(img.crop(border), topk = 30)
                 char_list.append(toplist)
-    
+    # show_borders(img, borders)
     if char_list:
         return 0, 'Successful', len(char_list), char_list
     else:

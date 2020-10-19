@@ -5,6 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 from skimage import measure, color
 from prediction import image_prediction
 from scipy.ndimage import gaussian_filter1d
+import time
 
 # 利用图片分块预测的先验知识确定最佳图片分割点
 def find_seg_point(seg_num, char_num, confM, charConfM, seg_type, index, count, alt_seg, max_conf, max_seg, label_weight = 5):
@@ -106,7 +107,7 @@ def find_connect(img, direction = 0, threshold = 200, overlap = 0.5):
     
     return merge_areas
 
-def find_best_borders_connect(img, name, net_num = 825, threshold = 200, direction = 0, overlap = 0.85):
+def find_best_borders_connect(img, name, threshold = 200, direction = 0, overlap = 0.85, net_type = 'S'):
     limg = img.convert('L').point(lambda p: 0 if p > threshold else 1, '1')
     img_data = np.array(limg, dtype=np.int32)
     direction_sum = img_data.sum(axis=direction)
@@ -145,13 +146,12 @@ def find_best_borders_connect(img, name, net_num = 825, threshold = 200, directi
                         border = [merge_area[i][0], up, merge_area[j][1], down]
                     pred_img = img.crop(border)
                     # display(pred_img)
-                    charM[i][j], confM[i][j], _, charConfM[i][j] = image_prediction(pred_img, topk = 1, net_num = net_num, labels = name_list)
+                    charM[i][j], confM[i][j], _, charConfM[i][j] = image_prediction(pred_img, topk = 1, labels = name_list, net_type = net_type)
 
         _, max_conf, max_seg = find_seg_point(area_num, char_num, confM, charConfM, 2, 0, char_num, [-1], 0, [-1])
 
         if len(max_seg) != char_num + 1:
             return []
-            
     borders = []
     for i in range(char_num):
         if direction == 0:
@@ -162,7 +162,7 @@ def find_best_borders_connect(img, name, net_num = 825, threshold = 200, directi
     return borders
 
 # 求数列的极值点
-def find_local_min(arr, gap=5):
+def find_local_min(arr):
     loc_min = []
     loc_min.append(np.where(arr > 0)[0][0])
     pre = arr[0]
@@ -173,9 +173,9 @@ def find_local_min(arr, gap=5):
             alt_min_pos = i
             alt_min = a
         elif a > pre and alt_min_pos:
+            if pre == alt_min:
+                alt_min_pos = (i - 1 + alt_min_pos) // 2
             loc_min.append(alt_min_pos)
-            if pre == alt_min and i-1 > alt_min_pos + gap:
-                loc_min.append(i-1)
             alt_min_pos = None
             alt_min = None
         pre = a
@@ -183,7 +183,7 @@ def find_local_min(arr, gap=5):
     return loc_min
 
 # 投影高斯平滑极值法
-def find_best_borders_gas(img, name, net_num = 825, threshold = 200, direction = 0, gas_std = 8, gap = 5):
+def find_best_borders_gas(img, name, threshold = 200, direction = 0, gas_std = 8, net_type = 'S'):
     name_list = list(name)
     char_num = len(name)
     limg = img.convert('L').point(lambda p: 0 if p > threshold else 1, '1')
@@ -197,6 +197,7 @@ def find_best_borders_gas(img, name, net_num = 825, threshold = 200, direction =
     min_num = len(local_min)
     char_min = length / char_num / 2
     char_max = min(length / char_num * 2, length / 3 * 2)
+    count = 0
     if min_num-1 < char_num:
         return []
     elif min_num-1 == char_num:
@@ -217,13 +218,13 @@ def find_best_borders_gas(img, name, net_num = 825, threshold = 200, direction =
                         border = [local_min[i], up, local_min[j], down]
                     pred_img = img.crop(border)
                     # display(pred_img)
-                    charM3[i][j], confM3[i][j], toplist, charConfM3[i][j] = image_prediction(pred_img, topk = 1, net_num = net_num, labels=name_list)
-        
+                    count += 1
+                    charM3[i][j], confM3[i][j], toplist, charConfM3[i][j] = image_prediction(pred_img, topk = 1, labels=name_list, net_type = net_type)
         _, max_conf, max_seg = find_seg_point(min_num, char_num, confM3, charConfM3, 3, 0, char_num, [0], 0, [0])
-
         if len(max_seg) != char_num + 1:
             return []
 
+    # print(name, ", minpoint count: ", min_num, ", predict count: ", count)
     borders = []
     for i in range(char_num):
         if direction == 0:
