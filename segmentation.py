@@ -54,7 +54,6 @@ def extrack_point(line_sum, min_sum, min_gap):
 
 def find_best_borders_projection(img, name, threshold = 200, direction = 0, min_sum = 1, min_gap = 1):
     limg = img.convert('L').point(lambda p: 0 if p > threshold else 1, '1')
-    limg = np.array(limg, dtype=np.int32)
     img_data = np.array(limg, dtype=np.int32)
     verdire_sum = img_data.sum(axis=1-direction)
     length = len(np.where(verdire_sum>0)[0])
